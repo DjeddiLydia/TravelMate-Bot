@@ -13,11 +13,28 @@ export default function Home() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const minPersonnes = ['couple', 'famille', "groupe d'amis"].includes(form.categorie) ? 2 : 1;
+
+  const validateForm = () => {
+    const errors = {};
+    if (!form.date_debut) errors.date_debut = "Date de départ requise.";
+    if (!form.date_fin) errors.date_fin = "Date de retour requise.";
+    if (form.date_debut && form.date_fin && form.date_debut >= form.date_fin)
+      errors.date_fin = "Doit être après la date de départ.";
+    if (['couple', 'famille', "groupe d'amis"].includes(form.categorie) && parseInt(form.nb_personnes) < 2)
+      errors.nb_personnes = `Minimum 2 personnes pour "${form.categorie}".`;
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleSubmit = async () => {
+    if (!validateForm()) return; // single call, uses setFieldErrors internally
+
     setLoading(true);
     setResult(null);
-    setError('');
+    setError("");
+
     try {
       const body = {
         ...form,
@@ -25,21 +42,30 @@ export default function Home() {
         budget: form.budget ? parseFloat(form.budget) : null,
         destination: form.destination || null,
       };
-      const res = await fetch('http://127.0.0.1:8000/itineraire', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+
+      const res = await fetch("http://127.0.0.1:8000/itineraire", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
+
       const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.detail || "Erreur lors de la génération.");
+        return;
+      }
+
       setResult(data);
     } catch (e) {
       setError("Erreur : impossible de contacter le serveur.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
-
-  return (
+    return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-900">
+
 
       {/* Header */}
       <div className="text-center py-12 px-4">
@@ -82,8 +108,10 @@ export default function Home() {
               <input type="date"
                 className="w-full bg-white/10 border border-white/20 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
                 value={form.date_fin}
+                min={form.date_debut || undefined}
                 onChange={e => setForm({...form, date_fin: e.target.value})}
               />
+              {fieldErrors.date_fin && (<p className="text-red-400 text-xs mt-1">{fieldErrors.date_fin}</p>)}
             </div>
           </div>
 
@@ -100,11 +128,13 @@ export default function Home() {
             </div>
             <div>
               <label className="block text-sm font-semibold text-blue-200 mb-2">👥 Nombre de personnes</label>
-              <input type="number" min="1"
+            
+              <input type="number" min={minPersonnes}
                 className="w-full bg-white/10 border border-white/20 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
                 value={form.nb_personnes}
                 onChange={e => setForm({...form, nb_personnes: e.target.value})}
               />
+              {fieldErrors.nb_personnes && (<p className="text-red-400 text-xs mt-1">{fieldErrors.nb_personnes}</p>)}
             </div>
           </div>
 
