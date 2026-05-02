@@ -123,7 +123,8 @@ async def forgot_password(body: ForgotPasswordRequest, db=Depends(get_db)):
     db.commit()
  
     # Envoyer l'email
-    reset_link = f"http://localhost:3000/reset?token={token}"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    reset_link = f"{frontend_url}/reset?token={token}"
     message = MessageSchema(
         subject="🔑 Réinitialisation de votre mot de passe TravelMate",
         recipients=[body.email],
