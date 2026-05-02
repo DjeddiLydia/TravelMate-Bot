@@ -8,4 +8,4 @@ bcrypt==4.0.1
 sqlalchemy
 psycopg2-binary
 python-multipart
-fastapi-mail
+sib-api-v3-sdk
