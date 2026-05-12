@@ -9,6 +9,7 @@ from passlib.context import CryptContext
 from database import SessionLocal, User, History, PasswordResetToken
 import sib_api_v3_sdk
 from sib_api_v3_sdk.rest import ApiException
+from json_repair import repair_json
 import os
 import json
 import secrets
@@ -336,7 +337,8 @@ RÈGLES OBLIGATOIRES :
     response = client.chat.completions.create(
         model="llama-3.3-70b-versatile",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.7
+        temperature=0.7,
+        max_tokens=4096,
     )
 
     text = response.choices[0].message.content
@@ -347,7 +349,8 @@ RÈGLES OBLIGATOIRES :
             text = text[4:]
     text = text.strip()
 
-    data = json.loads(text)
+    # --- FIX : réparation JSON avant parsing ---
+    data = json.loads(repair_json(text))
 
     # Sauvegarde dans l'historique si connecté
     try:
