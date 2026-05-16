@@ -282,6 +282,7 @@ export default function Home() {
   const [lastSuggestions, setLastSuggestions] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [authModal, setAuthModal] = useState(null);
@@ -296,7 +297,22 @@ export default function Home() {
   const handleAuthSuccess = (email, tok) => { setUser(email); setToken(tok); setAuthModal(null); };
   const handleLogout = () => { localStorage.removeItem('tm_token'); localStorage.removeItem('tm_email'); setUser(null); setToken(null); };
 
+  const MULTI_PERSON_CATEGORIES = ['couple', 'famille', "groupe d'amis"];
+
+  const validateForm = () => {
+    const errors = {};
+    if (!form.date_debut) errors.date_debut = "Date de départ requise.";
+    if (!form.date_fin) errors.date_fin = "Date de retour requise.";
+    if (form.date_debut && form.date_fin && form.date_debut >= form.date_fin)
+      errors.date_fin = "Doit être après la date de départ.";
+    if (MULTI_PERSON_CATEGORIES.includes(form.categorie) && parseInt(form.nb_personnes) < 2)
+      errors.nb_personnes = `Minimum 2 personnes pour la catégorie "${form.categorie}".`;
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const callAPI = async (overrides = {}) => {
+    if (!validateForm()) return;
     setLoading(true); setResult(null); setError('');
     try {
       const body = { ...form, ...overrides, nb_personnes: parseInt(form.nb_personnes), budget: form.budget ? parseFloat(form.budget) : null, destination: (overrides.destination ?? form.destination) || null };
@@ -321,7 +337,7 @@ export default function Home() {
     return '🗺️ Générer mon itinéraire complet';
   };
 
-  const canSubmit = form.date_debut && form.date_fin;
+  const canSubmit = form.date_debut && form.date_fin && form.date_debut < form.date_fin;
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-900">
@@ -371,16 +387,19 @@ export default function Home() {
                   Date de départ <BadgeRequired />
                 </label>
                 <input type="date"
-                  className={`w-full bg-white/10 border rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all ${!form.date_debut ? 'border-red-400/50' : 'border-white/20'}`}
-                  value={form.date_debut} onChange={e => setForm({ ...form, date_debut: e.target.value })} />
+                  className={`w-full bg-white/10 border rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all ${fieldErrors.date_debut ? 'border-red-400' : !form.date_debut ? 'border-red-400/50' : 'border-white/20'}`}
+                  value={form.date_debut} onChange={e => { setForm({ ...form, date_debut: e.target.value }); setFieldErrors(fe => ({ ...fe, date_debut: undefined })); }} />
+                {fieldErrors.date_debut && <p className="text-red-400 text-xs mt-1 pl-1">{fieldErrors.date_debut}</p>}
               </div>
               <div>
                 <label className="flex items-center text-xs font-semibold text-white/70 uppercase tracking-wide mb-2">
                   Date de retour <BadgeRequired />
                 </label>
                 <input type="date"
-                  className={`w-full bg-white/10 border rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all ${!form.date_fin ? 'border-red-400/50' : 'border-white/20'}`}
-                  value={form.date_fin} onChange={e => setForm({ ...form, date_fin: e.target.value })} />
+                  min={form.date_debut || undefined}
+                  className={`w-full bg-white/10 border rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all ${fieldErrors.date_fin ? 'border-red-400' : !form.date_fin ? 'border-red-400/50' : 'border-white/20'}`}
+                  value={form.date_fin} onChange={e => { setForm({ ...form, date_fin: e.target.value }); setFieldErrors(fe => ({ ...fe, date_fin: undefined })); }} />
+                {fieldErrors.date_fin && <p className="text-red-400 text-xs mt-1 pl-1">{fieldErrors.date_fin}</p>}
               </div>
             </div>
           </div>
@@ -424,16 +443,26 @@ export default function Home() {
                 <label className="flex items-center text-xs font-semibold text-white/70 uppercase tracking-wide mb-2">
                   Nombre de personnes <BadgeRequired />
                 </label>
-                <input type="number" min="1"
-                  className="w-full bg-white/10 border border-white/20 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  value={form.nb_personnes} onChange={e => setForm({ ...form, nb_personnes: e.target.value })} />
+                <input type="number" min={MULTI_PERSON_CATEGORIES.includes(form.categorie) ? 2 : 1}
+                  className={`w-full bg-white/10 border rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all ${fieldErrors.nb_personnes ? 'border-red-400' : 'border-white/20'}`}
+                  value={form.nb_personnes} onChange={e => { setForm({ ...form, nb_personnes: e.target.value }); setFieldErrors(fe => ({ ...fe, nb_personnes: undefined })); }} />
+                {fieldErrors.nb_personnes && <p className="text-red-400 text-xs mt-1 pl-1">{fieldErrors.nb_personnes}</p>}
               </div>
               <div>
                 <label className="flex items-center text-xs font-semibold text-white/70 uppercase tracking-wide mb-2">
                   Catégorie de voyageur <BadgeRequired />
                 </label>
                 <select className="w-full bg-slate-800 border border-white/20 rounded-xl p-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  value={form.categorie} onChange={e => setForm({ ...form, categorie: e.target.value })}>
+                  value={form.categorie} onChange={e => {
+                    const newCat = e.target.value;
+                    const needsTwo = MULTI_PERSON_CATEGORIES.includes(newCat);
+                    setForm(f => ({
+                      ...f,
+                      categorie: newCat,
+                      nb_personnes: needsTwo && parseInt(f.nb_personnes) < 2 ? 2 : f.nb_personnes,
+                    }));
+                    setFieldErrors(fe => ({ ...fe, nb_personnes: undefined }));
+                  }}>
                   <option value="couple">👫 Couple</option>
                   <option value="famille">👨‍👩‍👧‍👦 Famille</option>
                   <option value="retraités">👴 Retraités</option>
@@ -518,7 +547,11 @@ export default function Home() {
 
           {/* ── CTA ── */}
           {!canSubmit && (
-            <p className="text-center text-red-300/80 text-sm mb-3">⚠️ Renseignez les dates de départ et de retour pour continuer</p>
+            <p className="text-center text-red-300/80 text-sm mb-3">
+              {!form.date_debut || !form.date_fin
+                ? '⚠️ Renseignez les dates de départ et de retour pour continuer'
+                : '⚠️ La date de retour doit être après la date de départ'}
+            </p>
           )}
           <button onClick={handleSubmit} disabled={loading || !canSubmit}
             className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 disabled:from-gray-600 disabled:to-gray-700 disabled:cursor-not-allowed text-white font-bold py-5 rounded-xl transition-all transform hover:scale-[1.02] shadow-lg text-lg">
